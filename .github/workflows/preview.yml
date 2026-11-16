@@ -1,0 +1,47 @@
+name: Preview (German fork)
+
+# Der Fork hat kein Pages-Site von GitHub: die Workflows brauchen Actions-Rechte, die ein
+# Fork im Pull Request nicht bekommt. Stattdessen wandert jeder Build auf den Branch
+# `preview`, und dort wird er als rohes Verzeichnis ausgeliefert — so wie das Original es
+# mit dem gh-pages-Branch macht. Der Abschnitt /de/ ist die deutsche Fassung.
+# GitHub Pages liefert den Branch `preview` als Seitenwurzel aus, deshalb zeigen beide
+# Builds auf /sail-learn-and-train/ beziehungsweise /sail-learn-and-train/de/.
+
+on:
+  push:
+    branches: [de-translation-keep]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: preview
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - name: Build English under /
+        run: env APP_CHANNEL=next npm run build -- --base=/sail-learn-and-train/ --outDir=dist-preview
+      - name: Build German under /preview/de/
+        run: env APP_CHANNEL=next npm run build -- --base=/sail-learn-and-train/de/ --outDir=dist-preview-de
+      - name: Move the German build into /de/
+        run: |
+          mkdir -p dist-preview/de
+          cp -r dist-preview-de/. dist-preview/de/
+          touch dist-preview/.nojekyll
+      - uses: JamesIves/github-pages-deploy-action@fa24774553152dd7873cd16ebd8d959b010c5445 # v4.9.0
+        with:
+          branch: preview
+          folder: dist-preview
+          clean: true
+          force: false
